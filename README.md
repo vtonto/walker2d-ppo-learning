@@ -6,7 +6,8 @@
 
 Notebook 内直接包含：
 
-- `Walker2d-v5` 的 17 维观测、6 维力矩动作、奖励和终止探索；
+- `Walker2d-v5` 的浮动基、9 个广义自由度、6 个执行器、质量/摩擦/时钟参数；
+- 17 维观测、6 维归一化执行器输入、gear 与实际广义驱动力映射；
 - 随机策略 GIF 与摔倒诊断；
 - `PPOConfig` 与 `smoke / short / full` 三档配置；
 - 独立 Gaussian Actor 与 Critic；
@@ -15,11 +16,12 @@ Notebook 内直接包含：
 - Rollout Buffer 与跨 rollout 的 Episode 状态；
 - 区分 `terminated / truncated` 的 GAE 双 mask；
 - PPO-Clip、mini-batch、多 epoch、梯度裁剪；
-- CSV 日志、checkpoint、固定 seed 独立评估和 GIF；
+- 完整训练仪表盘、周期 checkpoint、固定 seed 独立评估和 GIF；
+- 躯干、关节、动作、广义驱动力和脚接触的 Policy Behavior Analysis；
 - 环境、张量、ratio、GAE、Clip、梯度、checkpoint 等断言测试；
 - 奖励权重对照实验区和鲁棒性扩展说明。
 
-> `smoke` 只验证一次 rollout → GAE → PPO update → checkpoint → evaluation，不代表策略已经学会行走。
+> `smoke` 只验证 rollout → GAE → PPO update → checkpoint → evaluation，不代表策略已经学会行走。
 
 ## Apple Silicon 安装
 
@@ -55,7 +57,7 @@ python -m jupyterlab
 
 ## 推荐学习顺序
 
-1. 只运行 00～02：理解环境、奖励、随机策略和跌倒。
+1. 只运行 00～02：理解浮动基、欠驱动、模型参数、奖励和随机策略跌倒。
 2. 运行 03～08：逐单元调试 Actor/Critic、GAE、Rollout 和 PPO 更新。
 3. 运行 09～11：执行 `smoke`、查看日志并保存评估 GIF。
 4. 将 `RUN_PROFILE` 改为 `short`，观察真实训练趋势。
@@ -72,7 +74,7 @@ python -m jupyterlab
 | 8–10 | 躯干 x/z 速度与角速度 |
 | 11–16 | 六个关节角速度 |
 
-动作 `shape=(6,)`，顺序为右髋/膝/踝、左髋/膝/踝的力矩控制，范围 `[-1, 1]`。默认不把绝对 x 位置交给策略，但 `info["x_position"]` 可用于独立评估。
+动作 `shape=(6,)`，顺序为右髋/膝/踝、左髋/膝/踝的归一化执行器控制输入，范围 `[-1, 1]`。它不是直接以 N·m 表示的关节力矩；Notebook 会读取 actuator gear、`data.actuator_force` 和 `data.qfrc_actuator` 检查映射。默认不把绝对 x 位置交给策略，但 `info["x_position"]` 可用于独立评估。
 
 默认奖励为：
 
@@ -100,15 +102,20 @@ PPO ratio 始终评价同一个 raw action，因此内部一致；但它不是�
 运行 Notebook 后会生成：
 
 ```text
-runs/notebook-smoke/
+runs/smoke-YYYYMMDD-HHMMSS/
 ├── config.json
 ├── metrics.csv
 ├── evaluation.json
+├── checkpoint_0000064.pt
+├── checkpoint_0000128.pt
 └── final.pt
 
 outputs/
 ├── random_policy.gif
-└── smoke-evaluation.gif
+├── smoke-evaluation.gif
+├── smoke-training-dashboard.png
+├── smoke-behavior.gif
+└── smoke-behavior-analysis.png
 ```
 
 这些运行产物默认不提交到 Git，避免仓库膨胀。
@@ -130,7 +137,8 @@ walker2d-ppo-learning/
 ## 已知边界
 
 - 首版单环境、CPU 优先，没有并行采样或观测归一化。
-- checkpoint 不保存 MuJoCo 当前 Episode 的完整状态，因此不支持位级一致的中途恢复。
+- 周期 checkpoint 保存模型、优化器、配置和随机数状态，但不保存 MuJoCo 当前 Episode/collector 状态，因此不支持位级一致的中途恢复。
+- `control_effort = Σ||a_env||²` 是归一化控制输入平方和，不是机械能耗。
 - 强化学习结果有随机性；正式结论应使用多个训练 seed 和相同的固定评估 seed。
 - 物理参数扰动属于纯仿真泛化测试，不等于真正 Sim-to-Real。
 

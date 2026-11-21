@@ -2,14 +2,17 @@
 
 验收日期：2026-11-21（Asia/Shanghai）
 
-## 本次结构调整
+## 本轮评审建议改进
 
-根据学习和调试需求，项目已改成“单 Notebook 即完整工程”：
+项目继续保持“单 Notebook 即完整工程”，并完成以下增量修改：
 
-- Actor、Critic、配置、GAE、PPO-Clip、Rollout、训练、评估、checkpoint 和绘图全部位于 `walker2d_ppo_learning.ipynb`；
-- 删除版本库中的 `src/`、`scripts/`、`tests/` 和 Python 打包配置；
-- 原独立测试改为 Notebook 相邻章节中的可运行断言，修改算法后可立即重跑对应单元；
-- `requirements.txt` 只负责创建环境，不安装本地 Python 包。
+1. 第 01 节增加浮动基与欠驱动解释，实际读取 `nq/nv/nu`、body mass、joint type/range/address、actuator transmission/gear/ctrlrange、geom friction、仿真时钟与真实 `qpos/qvel`。
+2. 增加固定单关节输入实验，核对 `data.ctrl → data.actuator_force → data.qfrc_actuator`。
+3. 第 10 节增加可复用的 `plot_training_metrics()`，覆盖 Episode Return/Length、奖励分项、Actor/Critic Loss、KL、Clip Fraction、Std/Entropy、动作饱和、结束原因、吞吐等真实 CSV 指标并保存 PNG。
+4. 第 11 节增加 Policy Behavior Analysis，以真实仿真时间绘制躯干、位移/速度、关节角/速度、raw/执行动作、广义驱动力与实际脚地接触，并保存对应 GIF。
+5. 将误导性的 `control_energy` 改为累计/每步 `control_effort`，明确它不是物理能耗；评估同时报告平均速度与动作饱和。
+6. 增加周期 checkpoint；不同运行使用带时间戳的独立目录，避免覆盖。
+7. 第 12 节增加共同默认环境、固定 seeds 的 checkpoint 统一评估和对照绘图函数，等待真实基线后使用。
 
 ## 实际验证环境
 
@@ -20,21 +23,32 @@
 - MuJoCo 4.0.1
 - PyTorch 2.15.0
 
-依赖范围写在 `requirements.txt`；上述是本次实际运行版本，不代表唯一兼容组合。
-
 ## 实际执行结果
 
-1. Notebook 共 36 个单元，其中 19 个代码单元。
-2. 整本 Notebook 从头顺序执行成功，没有错误输出。
-3. Notebook 内包含 25 条显式 `assert`，覆盖环境维度/dtype、奖励分解、联合 log probability、更新前 ratio、GAE 的 terminated/truncated/rollout 边界、PPO Clip、跨 rollout Episode、有限数值、梯度和 checkpoint 往返。
-4. 真实 `Walker2d-v5` 成功完成环境探索、128 步 rollout、一次 PPO update、checkpoint 保存与独立评估。
-5. 随机策略和 smoke 策略 GIF 均成功生成。
+- Notebook 共 42 个单元，其中 22 个代码单元。
+- 整本 Notebook 从头顺序执行成功，无错误输出。
+- 共 32 条显式断言通过，覆盖原 PPO/GAE/rollout 检查，以及模型维度、执行器映射、周期 checkpoint 加载等新增检查。
+- 真实模型读取确认 `nq=9, nv=9, nu=6`；固定第 0 个执行器输入验证了 gear 与对应广义驱动力映射。
+- smoke 实际运行 128 环境步、2 次 rollout/update，成功生成：
+  - `checkpoint_0000064.pt`
+  - `checkpoint_0000128.pt`
+  - `final.pt`
+  - `metrics.csv`、`evaluation.json`
+- 两个周期 checkpoint 均成功加载；第一个周期 checkpoint 完成固定 seed 独立评估。
+- 训练仪表盘 PNG、评估 GIF、行为分析 PNG/GIF 均实际生成并完成视觉检查。
 
 ## smoke 的真实结果
 
-本次 smoke 独立确定性评估只持续 17 步，Return 约 3.51，前进距离约 -0.10 m。它证明 Notebook 的训练闭环可运行，也说明 128 步策略尚未学会行走。
+本次 final checkpoint 的一次自动独立评估持续 16 步，Return 约 4.18，前进距离约 -0.087 m，平均速度约 -0.676 m/s，每步平均 `control_effort` 约 0.379。固定 seed 行为图如实显示策略向后移动并很快跌倒。
 
-没有运行足够预算的 `short` / `full` 训练，因此不声称已经收敛。下一步应先把 Notebook 第 10 节的 `RUN_PROFILE` 改成 `short`，再根据吞吐、动作饱和、KL、奖励分项和视频判断是否增加预算。
+这些结果只证明模型分析、日志、绘图、周期保存、加载和评估链路正确；128 步 smoke 不代表学会行走。
+
+## 尚未验证
+
+- 未自动运行 20,000 步 `short` 或 200,000 步 `full`，因此没有稳定行走结论。
+- 未执行三组奖励权重训练；共同环境评估函数已准备好，但不能用伪造数据填充结果。
+- 鲁棒性、Domain Randomization 和 RL + PD 仍是后续项目。
+- checkpoint 不包含完整 MuJoCo/collector 当前状态，不能做位级一致的中途恢复。
 
 ## 复验方式
 
@@ -42,6 +56,6 @@
 source .venv/bin/activate
 jupyter nbconvert --to notebook --execute walker2d_ppo_learning.ipynb \
   --ExecutePreprocessor.kernel_name=python3 \
-  --ExecutePreprocessor.timeout=180
+  --ExecutePreprocessor.timeout=240
 ```
 

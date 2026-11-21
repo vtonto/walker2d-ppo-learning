@@ -15,11 +15,11 @@
 | 解释 | 数据支持/反驳了什么？还有哪些混杂因素？ |
 | 下一步 | 最小的后续验证是什么？ |
 
-共同外部指标建议：Episode Length、实际前进距离、每回合控制能量、动作饱和比例。它们不依赖训练 Return 的奖励权重，可在同一评估环境下比较。
+共同外部指标建议：Episode Length、实际前进距离、平均速度、累计/每步 `control_effort`、动作饱和比例。`control_effort` 是归一化动作平方和，不是物理能量。这些指标不依赖训练 Return 的奖励权重，可在同一默认评估环境和固定 seeds 下比较。
 
 ## C1：控制代价权重
 
-假设示例：“更大的控制惩罚可能降低动作幅度和能量，但也可能使策略难以恢复平衡。”
+假设示例：“更大的控制惩罚可能降低动作幅值和 control effort，但也可能使策略难以恢复平衡。”
 
 ```python
 experiment_configs = {
@@ -30,7 +30,7 @@ experiment_configs = {
 checkpoints = {name: train(cfg) for name, cfg in experiment_configs.items()}
 ```
 
-观察：`action_saturation`、控制能量、前进距离、Length、拖脚/抖动/摔倒视频。不要只比较三种定义不同的训练 Return。
+观察：`action_saturation`、累计/每步 `control_effort`、前进距离、平均速度、Length、拖脚/抖动/摔倒视频。不要只比较三种定义不同的训练 Return。Notebook 第 12 节提供 `evaluate_checkpoints_in_common_environment()` 和统一对照图。
 
 ## C2：前进奖励权重
 
@@ -57,7 +57,7 @@ high_checkpoint = train(high_forward)
 
 ## D：纯仿真鲁棒性扩展
 
-在训练完成后复制 MuJoCo 模型参数并做测试时扰动，例如地面摩擦或连杆质量的 0.9×/1.0×/1.1×。先保持策略固定，再比较标称/扰动条件的前进距离、Length 和能量。
+在训练完成后复制 MuJoCo 模型参数并做测试时扰动，例如地面摩擦或连杆质量的 0.9×/1.0×/1.1×。先保持策略固定，再比较标称/扰动条件的前进距离、Length 和 `control_effort`。
 
 这只能说明仿真内泛化。真实机器人还包含传感器噪声、执行器带宽、延迟、未建模柔性与接触误差，不能据此声称完成 Sim-to-Real。
 

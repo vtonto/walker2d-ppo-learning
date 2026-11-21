@@ -85,3 +85,27 @@ r_{ctrl}=-w_c\|a_{env}\|_2^2.
 
 17 维默认观测包含仿真精确给出的关节状态、躯干姿态与速度。这些量在真实机器人上通常需要编码器和状态估计，不能简单等同于无噪声的真实传感器读数。绝对 x 位置默认不在策略观测中，但用于独立评估。
 
+速度观测会被环境裁剪到 `[-10, 10]`；分析真实仿真动力学状态时应读取 `env.unwrapped.data.qvel`。
+
+## 7. 欠驱动与动作到驱动力
+
+Walker2d 的 9 个广义自由度包括平面浮动基的 `rootx / rootz / rooty` 和六个腿部关节，只有后六个 DOF 由执行器直接驱动：
+
+\[
+M(q)\ddot q+h(q,\dot q)=S^\mathsf T\tau+J_c^\mathsf T\lambda.
+\]
+
+`action ∈ [-1,1]^6` 是执行器控制输入，不应直接标成 N·m。当前 motor 模型通过 actuator gear 和传动映射形成 `data.qfrc_actuator`；Notebook 第 01B 节用固定单关节输入从实际模型核对这一关系。
+
+## 8. Control effort 不是能耗
+
+独立评估报告：
+
+\[
+C_{effort}=\sum_t\lVert a_t^{env}\rVert_2^2,
+\qquad
+\bar C_{effort}=C_{effort}/T.
+\]
+
+它们分别是累计和每步平均的归一化控制输入平方和，不是机械能或电能。若研究机械功，需要另外计算 `τᵀ q̇` 并明确正功、负功、绝对功及物理子步积分。
+
