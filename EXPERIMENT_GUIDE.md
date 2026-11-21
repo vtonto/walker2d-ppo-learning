@@ -1,6 +1,6 @@
 # 对照实验指南
 
-先完成 `pytest` 和 `smoke`，再建立一个未改奖励的基线。每次只改变一个变量；不同奖励定义下的训练 Return 不能直接作为跨实验优劣结论。
+先从上到下运行 Notebook 的断言检查和 `smoke`，再建立一个未改奖励的基线。每次只改变一个变量；不同奖励定义下的训练 Return 不能直接作为跨实验优劣结论。
 
 ## 通用记录模板
 
@@ -21,29 +21,28 @@
 
 假设示例：“更大的控制惩罚可能降低动作幅度和能量，但也可能使策略难以恢复平衡。”
 
-```bash
-# 基线
-walker2d-train --profile short --seed 1 \
-  --ctrl-cost-weight 0.001 --output-dir runs/c1/base-seed1
-
-# 较小控制代价
-walker2d-train --profile short --seed 1 \
-  --ctrl-cost-weight 0.0001 --output-dir runs/c1/low-seed1
-
-# 较大控制代价
-walker2d-train --profile short --seed 1 \
-  --ctrl-cost-weight 0.01 --output-dir runs/c1/high-seed1
+```python
+experiment_configs = {
+    "low": profile("short", ctrl_cost_weight=1e-4, output_dir=Path("runs/c1/low")),
+    "base": profile("short", ctrl_cost_weight=1e-3, output_dir=Path("runs/c1/base")),
+    "high": profile("short", ctrl_cost_weight=1e-2, output_dir=Path("runs/c1/high")),
+}
+checkpoints = {name: train(cfg) for name, cfg in experiment_configs.items()}
 ```
 
 观察：`action_saturation`、控制能量、前进距离、Length、拖脚/抖动/摔倒视频。不要只比较三种定义不同的训练 Return。
 
 ## C2：前进奖励权重
 
-```bash
-walker2d-train --profile short --seed 1 \
-  --forward-reward-weight 0.5 --output-dir runs/c2/forward-05-seed1
-walker2d-train --profile short --seed 1 \
-  --forward-reward-weight 2.0 --output-dir runs/c2/forward-20-seed1
+```python
+low_forward = profile(
+    "short", forward_reward_weight=0.5, output_dir=Path("runs/c2/forward-05")
+)
+high_forward = profile(
+    "short", forward_reward_weight=2.0, output_dir=Path("runs/c2/forward-20")
+)
+low_checkpoint = train(low_forward)
+high_checkpoint = train(high_forward)
 ```
 
 统一用默认奖励配置或纯物理指标复评 checkpoint，避免把更大的 reward scale 错解为更好的策略。

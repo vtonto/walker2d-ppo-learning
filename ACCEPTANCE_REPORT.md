@@ -2,17 +2,14 @@
 
 验收日期：2026-11-21（Asia/Shanghai）
 
-## 已完成
+## 本次结构调整
 
-- 根据需求建立 `Walker2d-v5` 教学项目，而不是仅提供规划；
-- 从倒立摆项目迁移独立 Actor/Critic、GAE、PPO-Clip、mini-batch 更新、checkpoint 与评估结构；
-- 针对 6 维动作实现联合 `log_prob.sum(-1)`；
-- 实现 raw Gaussian action → environment clip 的一致 Buffer/ratio 语义；
-- 分开处理 `terminated` 的 bootstrap mask 与 `terminated or truncated` 的 GAE continuation mask；
-- rollout 边界保留当前 Episode 的状态、Return 和 Length；
-- 记录奖励分项、动作饱和、Actor/Critic loss、KL、Clip Fraction、Entropy、吞吐和结束原因；
-- 提供 `smoke`、`short`、`full` 三档运行入口、独立确定性评估与 GIF；
-- 提供奖励权重对照实验模板和纯仿真鲁棒性扩展说明。
+根据学习和调试需求，项目已改成“单 Notebook 即完整工程”：
+
+- Actor、Critic、配置、GAE、PPO-Clip、Rollout、训练、评估、checkpoint 和绘图全部位于 `walker2d_ppo_learning.ipynb`；
+- 删除版本库中的 `src/`、`scripts/`、`tests/` 和 Python 打包配置；
+- 原独立测试改为 Notebook 相邻章节中的可运行断言，修改算法后可立即重跑对应单元；
+- `requirements.txt` 只负责创建环境，不安装本地 Python 包。
 
 ## 实际验证环境
 
@@ -23,30 +20,28 @@
 - MuJoCo 4.0.1
 - PyTorch 2.15.0
 
-依赖范围写在 `pyproject.toml`；上述是本次实际解析并运行的版本，不代表唯一兼容组合。
+依赖范围写在 `requirements.txt`；上述是本次实际运行版本，不代表唯一兼容组合。
 
 ## 实际执行结果
 
-1. `pytest`：11 项全部通过。
-2. 真实 `Walker2d-v5`：成功完成 `reset` / `step`，确认观测 `(17,) float64`、动作 `(6,) float32`、奖励分项及 `dt = timestep × frame_skip`。
-3. `python scripts/smoke_train.py`：成功完成 128 环境步、一次 rollout、GAE、PPO update、checkpoint 保存和一次独立评估。
-4. `walker2d_ppo_learning.ipynb`：24 个单元从头顺序执行完成，无错误。
-5. 渲染：成功生成随机策略与 smoke 策略 GIF。
-6. checkpoint 往返：同一观测的确定性动作在保存/加载前后一致。
+1. Notebook 共 36 个单元，其中 19 个代码单元。
+2. 整本 Notebook 从头顺序执行成功，没有错误输出。
+3. Notebook 内包含 25 条显式 `assert`，覆盖环境维度/dtype、奖励分解、联合 log probability、更新前 ratio、GAE 的 terminated/truncated/rollout 边界、PPO Clip、跨 rollout Episode、有限数值、梯度和 checkpoint 往返。
+4. 真实 `Walker2d-v5` 成功完成环境探索、128 步 rollout、一次 PPO update、checkpoint 保存与独立评估。
+5. 随机策略和 smoke 策略 GIF 均成功生成。
 
-## smoke 的真实结果与解释
+## smoke 的真实结果
 
-本次 smoke 的训练日志显示 128 个环境步、1 次 PPO update；独立确定性评估只持续 17 步，Return 约为 3.51，前进距离约为 -0.10 m。它说明接线、数值和文件输出正常，也清楚说明 128 步策略尚未学会行走。
+本次 smoke 独立确定性评估只持续 17 步，Return 约 3.51，前进距离约 -0.10 m。它证明 Notebook 的训练闭环可运行，也说明 128 步策略尚未学会行走。
 
-没有运行足够预算的 `short` / `full` 训练，因此不声称已经收敛，也没有提交“成功步态”权重。下一步应先运行 `short` 查看吞吐、动作饱和、KL、回报和视频，再决定训练预算；如失败，按 README 中的边界语义和诊断指标逐项排查。
+没有运行足够预算的 `short` / `full` 训练，因此不声称已经收敛。下一步应先把 Notebook 第 10 节的 `RUN_PROFILE` 改成 `short`，再根据吞吐、动作饱和、KL、奖励分项和视频判断是否增加预算。
 
-## 可复现命令
+## 复验方式
 
 ```bash
 source .venv/bin/activate
-pytest
-python scripts/smoke_train.py
 jupyter nbconvert --to notebook --execute walker2d_ppo_learning.ipynb \
-  --ExecutePreprocessor.kernel_name=python3 --ExecutePreprocessor.timeout=180
+  --ExecutePreprocessor.kernel_name=python3 \
+  --ExecutePreprocessor.timeout=180
 ```
 

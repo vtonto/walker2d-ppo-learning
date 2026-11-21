@@ -1,10 +1,10 @@
 # PPO 公式与代码映射
 
-这份笔记只解释 Walker2d 迁移中最容易出错的对应关系。完整入口见 `walker2d_ppo_learning.ipynb`。
+这份笔记只解释 Walker2d 迁移中最容易出错的对应关系。所有实现都直接位于 `walker2d_ppo_learning.ipynb`。
 
 ## 1. 多维高斯动作
 
-Actor 对 6 个动作坐标输出因子化高斯。代码中的 `GaussianActor.joint_log_prob` 只沿最后一个动作维求和：
+Actor 对 6 个动作坐标输出因子化高斯。Notebook 中的 `GaussianActor.joint_log_prob` 只沿最后一个动作维求和：
 
 \[
 \log \pi_\theta(\mathbf u_t|s_t)
@@ -24,7 +24,7 @@ Actor 对 6 个动作坐标输出因子化高斯。代码中的 `GaussianActor.j
 
 ## 2. TD Error 与两个 mask
 
-代码位置：`src/walker2d_ppo/algorithm.py::compute_gae`。
+代码位置：Notebook 第 05 节的 `compute_gae` 单元。
 
 \[
 \delta_t=r_{t+1}+\gamma(1-\text{terminated}_t)V_{old}(s_{t+1})-V_{old}(s_t)
